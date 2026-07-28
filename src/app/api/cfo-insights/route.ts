@@ -31,7 +31,7 @@ export async function GET() {
     const salesVolume: Record<string, { name: string; sku: string; sold: number; current_stock: number }> = {}
     
     recentSales?.forEach(sale => {
-      const product = sale.products as { name: string; sku: string; current_stock: number } | null
+      const product = (sale.products as unknown) as { name: string; sku: string; current_stock: number } | null
       if (product) {
         if (!salesVolume[product.sku]) {
           salesVolume[product.sku] = {
