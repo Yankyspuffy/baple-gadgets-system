@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
-import { Search, Plus, PackagePlus } from "lucide-react"
+import { Search, Plus, PackagePlus, Edit2, Trash2 } from "lucide-react"
 import { Dialog } from "@/components/ui/dialog"
 
 type Product = {
@@ -29,6 +29,8 @@ export function InventoryClient() {
   // Modals state
   const [isAddOpen, setIsAddOpen] = useState(false)
   const [isReceiveOpen, setIsReceiveOpen] = useState(false)
+  const [isEditOpen, setIsEditOpen] = useState(false)
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
   // Form states
   const [newProduct, setNewProduct] = useState({ sku: '', name: '', category: '', cost_price: 0, selling_price: 0, current_stock: 0, reorder_level: 5, image_url: '' })
@@ -70,6 +72,37 @@ export function InventoryClient() {
       fetchProducts()
     } else {
       alert("Failed to add product: " + error.message)
+    }
+  }
+
+  const handleEditProduct = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!editingProduct) return
+
+    const productToUpdate = { ...editingProduct }
+    if (!productToUpdate.image_url) productToUpdate.image_url = '' // or null in DB, but '' works if type is text
+
+    const { error } = await supabase
+      .from('products')
+      .update(productToUpdate)
+      .eq('id', editingProduct.id)
+
+    if (!error) {
+      setIsEditOpen(false)
+      fetchProducts()
+    } else {
+      alert("Failed to update product: " + error.message)
+    }
+  }
+
+  const handleDeleteProduct = async (id: string) => {
+    if (confirm("Are you sure you want to delete this product? All related transactions will also be deleted.")) {
+      const { error } = await supabase.from('products').delete().eq('id', id)
+      if (!error) {
+        fetchProducts()
+      } else {
+        alert("Failed to delete product: " + error.message)
+      }
     }
   }
 
@@ -145,18 +178,19 @@ export function InventoryClient() {
               <TableHead className="text-right">Sell Price</TableHead>
               <TableHead className="text-right">Stock</TableHead>
               <TableHead>Status</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {loading ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-zinc-500">
+                <TableCell colSpan={9} className="h-24 text-center text-zinc-500">
                   Loading inventory...
                 </TableCell>
               </TableRow>
             ) : products.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={8} className="h-24 text-center text-zinc-500">
+                <TableCell colSpan={9} className="h-24 text-center text-zinc-500">
                   No products found.
                 </TableCell>
               </TableRow>
@@ -178,6 +212,27 @@ export function InventoryClient() {
                   <TableCell className="text-right text-zinc-300">{product.current_stock}</TableCell>
                   <TableCell>
                     {getStatusBadge(product.current_stock, product.reorder_level)}
+                  </TableCell>
+                  <TableCell className="text-right space-x-2">
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-zinc-400 hover:text-indigo-400 hover:bg-indigo-500/10"
+                      onClick={() => {
+                        setEditingProduct(product)
+                        setIsEditOpen(true)
+                      }}
+                    >
+                      <Edit2 className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-8 w-8 text-zinc-400 hover:text-red-400 hover:bg-red-500/10"
+                      onClick={() => handleDeleteProduct(product.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))
@@ -226,6 +281,52 @@ export function InventoryClient() {
           <div className="flex justify-end space-x-2 pt-4">
             <Button type="button" variant="ghost" className="hover:bg-zinc-800" onClick={() => setIsAddOpen(false)}>Cancel</Button>
             <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700">Save Product</Button>
+          </div>
+        </form>
+      </Dialog>
+
+      {/* Edit Product Modal */}
+      <Dialog open={isEditOpen} onClose={() => setIsEditOpen(false)} title="Edit Product">
+        <form onSubmit={handleEditProduct} className="space-y-4">
+          {editingProduct && (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">SKU</label>
+                <Input required value={editingProduct.sku} onChange={e => setEditingProduct({...editingProduct, sku: e.target.value})} placeholder="SKU-123" className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Name</label>
+                <Input required value={editingProduct.name} onChange={e => setEditingProduct({...editingProduct, name: e.target.value})} placeholder="Product Name" className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Category</label>
+                <Input required value={editingProduct.category} onChange={e => setEditingProduct({...editingProduct, category: e.target.value})} placeholder="Category" className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Current Stock</label>
+                <Input type="number" required value={editingProduct.current_stock} onChange={e => setEditingProduct({...editingProduct, current_stock: Number(e.target.value)})} className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Cost Price ($)</label>
+                <Input type="number" step="0.01" required value={editingProduct.cost_price} onChange={e => setEditingProduct({...editingProduct, cost_price: Number(e.target.value)})} className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Selling Price ($)</label>
+                <Input type="number" step="0.01" required value={editingProduct.selling_price} onChange={e => setEditingProduct({...editingProduct, selling_price: Number(e.target.value)})} className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Reorder Level</label>
+                <Input type="number" required value={editingProduct.reorder_level} onChange={e => setEditingProduct({...editingProduct, reorder_level: Number(e.target.value)})} className="bg-zinc-900 border-zinc-800" />
+              </div>
+              <div className="space-y-1">
+                <label className="text-xs text-zinc-400">Image URL (Optional)</label>
+                <Input type="url" value={editingProduct.image_url || ''} onChange={e => setEditingProduct({...editingProduct, image_url: e.target.value})} placeholder="https://example.com/image.png" className="bg-zinc-900 border-zinc-800" />
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end space-x-2 pt-4">
+            <Button type="button" variant="ghost" className="hover:bg-zinc-800" onClick={() => setIsEditOpen(false)}>Cancel</Button>
+            <Button type="submit" className="bg-indigo-600 hover:bg-indigo-700">Update Product</Button>
           </div>
         </form>
       </Dialog>
