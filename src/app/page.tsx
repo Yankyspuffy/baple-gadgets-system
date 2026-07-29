@@ -1,47 +1,70 @@
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { DollarSign, AlertTriangle, TrendingUp, Sparkles } from "lucide-react"
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
+import { DollarSign, AlertTriangle, TrendingUp, Sparkles, BarChart3, LineChart } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { InsightsClient } from "@/components/dashboard/InsightsClient"
+import { StockChart } from "@/components/dashboard/StockChart"
+import { SalesChart } from "@/components/dashboard/SalesChart"
 
 // Since Supabase requires anon key in client but we are doing SSR, we should fetch on the server.
 // However, the client is created with NEXT_PUBLIC keys so it can run anywhere.
 async function getDashboardMetrics() {
   const { data: products, error: productsError } = await supabase
     .from('products')
-    .select('current_stock, cost_price, selling_price, reorder_level')
+    .select('current_stock, cost_price, selling_price, reorder_level, category')
 
   if (productsError) {
     console.error(productsError)
-    return { totalValue: 0, lowStock: 0, profit: 0 }
+    return { totalValue: 0, lowStock: 0, profit: 0, stockByCategory: [], salesByDate: [] }
   }
 
   const totalValue = products?.reduce((sum, p) => sum + (p.current_stock * p.cost_price), 0) || 0
   const lowStock = products?.filter(p => p.current_stock <= p.reorder_level).length || 0
 
-  // For "This Week's Profit", we would need to fetch transactions, but let's mock the aggregation for now 
-  // or fetch real transactions if available.
+  // Aggregate stock by category
+  const categoryMap: Record<string, number> = {}
+  products?.forEach(p => {
+    const cat = p.category || 'Uncategorized'
+    categoryMap[cat] = (categoryMap[cat] || 0) + p.current_stock
+  })
+  const stockByCategory = Object.entries(categoryMap).map(([category, value]) => ({ category, value }))
+
+  // For "This Week's Profit", fetch transactions
   const oneWeekAgo = new Date()
   oneWeekAgo.setDate(oneWeekAgo.getDate() - 7)
 
   const { data: transactions, error: txError } = await supabase
     .from('inventory_transactions')
-    .select('quantity, transaction_type, products(selling_price, cost_price)')
+    .select('quantity, transaction_type, date, products(selling_price, cost_price)')
     .gte('date', oneWeekAgo.toISOString())
     .eq('transaction_type', 'SALE')
 
   let profit = 0
+  const salesMap: Record<string, number> = {}
+
   if (!txError && transactions) {
-    profit = transactions.reduce((sum, tx) => {
+    transactions.forEach((tx) => {
       // @ts-ignore - Supabase join typing
       const product = tx.products
       if (product) {
-        return sum + (tx.quantity * (product.selling_price - product.cost_price))
+        const saleProfit = (tx.quantity * (product.selling_price - product.cost_price))
+        profit += saleProfit
+        
+        const dateStr = new Date(tx.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        salesMap[dateStr] = (salesMap[dateStr] || 0) + saleProfit
       }
-      return sum
-    }, 0)
+    })
   }
 
-  return { totalValue, lowStock, profit }
+  // Generate last 7 days for X-axis even if 0 sales
+  const salesByDate = []
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date()
+    d.setDate(d.getDate() - i)
+    const dateStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+    salesByDate.push({ date: dateStr, sales: salesMap[dateStr] || 0 })
+  }
+
+  return { totalValue, lowStock, profit, stockByCategory, salesByDate }
 }
 
 export default async function DashboardOverview() {
@@ -86,7 +109,7 @@ export default async function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">${metrics.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
-            <p className="text-xs text-zinc-500 mt-1">+12.5% from last week</p>
+            <p className="text-xs text-zinc-500 mt-1">From last 7 days of sales</p>
           </CardContent>
         </Card>
       </div>
@@ -101,6 +124,32 @@ export default async function DashboardOverview() {
           </CardHeader>
           <CardContent>
             <CFOInsightsWidget />
+          </CardContent>
+        </Card>
+        
+        <Card className="col-span-4 lg:col-span-3">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <BarChart3 className="mr-2 h-5 w-5 text-indigo-500" />
+              Stock by Category
+            </CardTitle>
+            <CardDescription>Current inventory levels grouped by category</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <StockChart data={metrics.stockByCategory} />
+          </CardContent>
+        </Card>
+
+        <Card className="col-span-4 lg:col-span-4">
+          <CardHeader>
+            <CardTitle className="flex items-center">
+              <LineChart className="mr-2 h-5 w-5 text-emerald-500" />
+              Sales Profit (Last 7 Days)
+            </CardTitle>
+            <CardDescription>Daily profit trends over the last week</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <SalesChart data={metrics.salesByDate} />
           </CardContent>
         </Card>
       </div>

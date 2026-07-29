@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { LayoutDashboard, Package, History } from 'lucide-react'
+import { LayoutDashboard, Package, History, ClipboardList } from 'lucide-react'
 
 export function Sidebar() {
   return (
@@ -21,6 +21,10 @@ export function Sidebar() {
           <Link href="/logs" className="flex items-center rounded-md px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors">
             <History className="mr-3 h-5 w-5 text-zinc-400" />
             Stock Movement
+          </Link>
+          <Link href="/crm" className="flex items-center rounded-md px-3 py-2 text-sm font-medium text-zinc-300 hover:bg-zinc-900 hover:text-white transition-colors">
+            <ClipboardList className="mr-3 h-5 w-5 text-zinc-400" />
+            CRM Tasks
           </Link>
         </nav>
       </div>

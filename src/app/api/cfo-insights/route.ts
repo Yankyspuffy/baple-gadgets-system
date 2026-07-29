@@ -65,31 +65,46 @@ Low Stock Items (Need reorder): ${JSON.stringify(lowStockItems)}
 Top Selling Items (Last 7 Days): ${JSON.stringify(fastMovers)}
     `
 
-    // Call Gemini API
-    const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
-    const result = await model.generateContent(systemPrompt + dataContext)
-    const responseText = result.response.text()
+    let finalInsights: string[] = []
 
-    // Parse into bullet points
-    const insights = responseText
-      .split('\n')
-      .map(line => line.replace(/^[-*•\d.]\s*/, '').trim())
-      .filter(line => line.length > 0)
-      .slice(0, 3)
+    try {
+      // Call Gemini API
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+      const result = await model.generateContent(systemPrompt + dataContext)
+      const responseText = result.response.text()
+  
+      // Parse into bullet points
+      const insights = responseText
+        .split('\n')
+        .map(line => line.replace(/^[-*•\d.]\s*/, '').trim())
+        .filter(line => line.length > 0)
+        .slice(0, 3)
+      
+      finalInsights = insights.length === 3 ? insights : []
+    } catch (apiError) {
+      console.error('Gemini API Error:', apiError)
+      // We will fallback to generated insights if the API call fails
+    }
 
-    // Fallback if API returns weird formatting
-    const finalInsights = insights.length === 3 ? insights : [
-      "Analyze fast-moving SKUs to prevent stockouts and capitalize on high demand.",
-      "Review low-stock alerts and allocate capital to reorder essential items immediately.",
-      "Consider discounting slow-moving inventory to free up warehouse space and capital."
-    ]
+    // Fallback if API fails or returns weird formatting
+    if (finalInsights.length !== 3) {
+      finalInsights = [
+        "Analyze fast-moving SKUs to prevent stockouts and capitalize on high demand.",
+        "Review low-stock alerts and allocate capital to reorder essential items immediately.",
+        "Consider discounting slow-moving inventory to free up warehouse space and capital."
+      ]
+    }
 
     return NextResponse.json({ insights: finalInsights })
   } catch (error: any) {
-    console.error('CFO Insights Error:', error)
-    return NextResponse.json(
-      { error: 'Failed to generate insights', details: error.message },
-      { status: 500 }
-    )
+    console.error('CFO Insights DB/Setup Error:', error)
+    // Return graceful fallback even on major error
+    return NextResponse.json({
+      insights: [
+        "Monitor stock levels closely to ensure inventory availability.",
+        "Evaluate recent sales trends to optimize purchasing decisions.",
+        "Maintain adequate cash reserves for unexpected supply chain disruptions."
+      ]
+    })
   }
 }
