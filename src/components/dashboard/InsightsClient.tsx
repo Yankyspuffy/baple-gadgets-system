@@ -59,7 +59,13 @@ export function InsightsClient() {
           </li>
         ))}
       </ul>
-      <div className="pt-2 border-t border-indigo-900/50 flex justify-end">
+      <div className="pt-2 border-t border-indigo-900/50 flex justify-between items-center mt-4">
+        <a 
+          href="/cfo/report"
+          className="text-xs flex items-center bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-1.5 rounded transition-colors"
+        >
+          Generate Full Report
+        </a>
         <button 
           onClick={fetchInsights}
           className="text-xs flex items-center text-indigo-400 hover:text-indigo-300 transition-colors"

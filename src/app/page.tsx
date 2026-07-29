@@ -1,12 +1,14 @@
+import { Suspense } from "react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
-import { DollarSign, AlertTriangle, TrendingUp, Sparkles, BarChart3, LineChart } from "lucide-react"
+import { DollarSign, AlertTriangle, TrendingUp, Sparkles, BarChart3, LineChart, PieChart as PieChartIcon } from "lucide-react"
 import { supabase } from "@/lib/supabase/client"
 import { InsightsClient } from "@/components/dashboard/InsightsClient"
 import { StockChart } from "@/components/dashboard/StockChart"
 import { SalesChart } from "@/components/dashboard/SalesChart"
+import { CategoryPieChart } from "@/components/dashboard/CategoryPieChart"
 
-// Since Supabase requires anon key in client but we are doing SSR, we should fetch on the server.
-// However, the client is created with NEXT_PUBLIC keys so it can run anywhere.
+export const revalidate = 60 // ISR: Revalidate every 60 seconds
+
 async function getDashboardMetrics() {
   const { data: products, error: productsError } = await supabase
     .from('products')
@@ -67,31 +69,24 @@ async function getDashboardMetrics() {
   return { totalValue, lowStock, profit, stockByCategory, salesByDate }
 }
 
-export default async function DashboardOverview() {
+async function DashboardMetrics() {
   const metrics = await getDashboardMetrics()
 
   return (
-    <div className="flex-1 space-y-6">
-      <div className="flex items-center justify-between space-y-2">
-        <h2 className="text-3xl font-bold tracking-tight">Overview</h2>
-        <div className="flex items-center space-x-2">
-          {/* Calendar/Date Picker can go here */}
-        </div>
-      </div>
-      
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
+    <>
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        <Card className="bg-zinc-950 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Inventory Value</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-200">Total Inventory Value</CardTitle>
             <DollarSign className="h-4 w-4 text-zinc-400" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${metrics.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-bold text-white">${metrics.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <p className="text-xs text-zinc-500 mt-1">Based on current stock and cost price</p>
           </CardContent>
         </Card>
         
-        <Card>
+        <Card className="bg-zinc-950 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium text-red-500">Low Stock Alerts</CardTitle>
             <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -102,19 +97,19 @@ export default async function DashboardOverview() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="bg-zinc-950 border-zinc-800">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">This Week's Profit</CardTitle>
+            <CardTitle className="text-sm font-medium text-zinc-200">This Week's Profit</CardTitle>
             <TrendingUp className="h-4 w-4 text-emerald-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${metrics.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="text-2xl font-bold text-white">${metrics.profit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <p className="text-xs text-zinc-500 mt-1">From last 7 days of sales</p>
           </CardContent>
         </Card>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mb-6">
         <Card className="col-span-4 lg:col-span-7 bg-gradient-to-br from-indigo-950/40 to-zinc-950 border-indigo-900/50">
           <CardHeader>
             <CardTitle className="flex items-center text-indigo-400">
@@ -123,46 +118,69 @@ export default async function DashboardOverview() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <CFOInsightsWidget />
+             {/* We will add a new prop or update InsightsClient later to show the generate report button */}
+            <InsightsClient />
           </CardContent>
         </Card>
         
-        <Card className="col-span-4 lg:col-span-3">
+        <Card className="col-span-4 lg:col-span-3 bg-zinc-950 border-zinc-800">
           <CardHeader>
-            <CardTitle className="flex items-center">
-              <BarChart3 className="mr-2 h-5 w-5 text-indigo-500" />
-              Stock by Category
+            <CardTitle className="flex items-center text-zinc-100">
+              <PieChartIcon className="mr-2 h-5 w-5 text-indigo-500" />
+              Category Distribution
             </CardTitle>
-            <CardDescription>Current inventory levels grouped by category</CardDescription>
+            <CardDescription className="text-zinc-400">Inventory share by category</CardDescription>
           </CardHeader>
           <CardContent>
-            <StockChart data={metrics.stockByCategory} />
+            <CategoryPieChart data={metrics.stockByCategory} />
           </CardContent>
         </Card>
 
-        <Card className="col-span-4 lg:col-span-4">
+        <Card className="col-span-4 lg:col-span-4 bg-zinc-950 border-zinc-800">
           <CardHeader>
-            <CardTitle className="flex items-center">
+            <CardTitle className="flex items-center text-zinc-100">
               <LineChart className="mr-2 h-5 w-5 text-emerald-500" />
               Sales Profit (Last 7 Days)
             </CardTitle>
-            <CardDescription>Daily profit trends over the last week</CardDescription>
+            <CardDescription className="text-zinc-400">Daily profit trends over the last week</CardDescription>
           </CardHeader>
           <CardContent>
             <SalesChart data={metrics.salesByDate} />
           </CardContent>
         </Card>
       </div>
+    </>
+  )
+}
+
+// Skeletons for Suspense
+function MetricsSkeleton() {
+  return (
+    <div className="animate-pulse space-y-6">
+      <div className="grid gap-4 md:grid-cols-3 mb-6">
+        {[1, 2, 3].map(i => (
+          <div key={i} className="h-32 bg-zinc-900 rounded-xl border border-zinc-800"></div>
+        ))}
+      </div>
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-7 mb-6">
+        <div className="col-span-4 lg:col-span-7 h-48 bg-zinc-900 rounded-xl border border-zinc-800"></div>
+        <div className="col-span-4 lg:col-span-3 h-96 bg-zinc-900 rounded-xl border border-zinc-800"></div>
+        <div className="col-span-4 lg:col-span-4 h-96 bg-zinc-900 rounded-xl border border-zinc-800"></div>
+      </div>
     </div>
   )
 }
 
-async function CFOInsightsWidget() {
-  // We will hit the API route to fetch insights from Gemini
-  // In a real app, this might be a Client Component using SWR/React Query for loading states,
-  // but we can also fetch it directly on the server if we want.
-  // For the sleek SaaS feel, let's make it a client component that fetches.
+export default function DashboardOverview() {
   return (
-    <InsightsClient />
+    <div className="flex-1 space-y-6">
+      <div className="flex items-center justify-between space-y-2 mb-4">
+        <h2 className="text-3xl font-bold tracking-tight text-white">Overview</h2>
+      </div>
+      
+      <Suspense fallback={<MetricsSkeleton />}>
+        <DashboardMetrics />
+      </Suspense>
+    </div>
   )
 }
