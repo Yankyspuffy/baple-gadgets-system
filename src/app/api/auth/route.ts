@@ -12,17 +12,19 @@ export async function POST(request: Request) {
     }
 
     if (passphrase === correctPassphrase) {
-      cookies().set('admin_auth', 'true', {
+      const res = NextResponse.json({ success: true })
+      res.cookies.set('admin_auth', 'true', {
         httpOnly: true,
         secure: process.env.NODE_ENV === 'production',
         sameSite: 'strict',
         maxAge: 60 * 60 * 24 * 7 // 1 week
       })
-      return NextResponse.json({ success: true })
+      return res
     }
 
     return NextResponse.json({ error: 'Invalid passphrase' }, { status: 401 })
-  } catch (error) {
-    return NextResponse.json({ error: 'Internal Server Error' }, { status: 500 })
+  } catch (error: any) {
+    console.error("Auth API Error:", error)
+    return NextResponse.json({ error: error.message || 'Internal Server Error' }, { status: 500 })
   }
 }
