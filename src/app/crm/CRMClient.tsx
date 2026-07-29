@@ -45,6 +45,7 @@ export function CRMClient({ initialTasks }: { initialTasks: Task[] }) {
 
     if (error) {
       console.error(error)
+      alert("Failed to create task: " + error.message)
       return
     }
 
